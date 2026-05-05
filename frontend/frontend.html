@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Explorador de Citações</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0f172a;
+      color: #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      padding: 20px;
+      text-align: center;
+      background: #020617;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 30px auto;
+      padding: 0 15px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .autor {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #38bdf8;
+    }
+
+    .tags {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .link {
+      display: inline-block;
+      margin-top: 10px;
+      color: #38bdf8;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .link:hover {
+      text-decoration: underline;
+    }
+
+    #status {
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    #buscaTag {
+      display: block;
+      margin: 20px auto;
+      padding: 10px;
+      width: 60%;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      background: #1e293b;
+      color: #e5e7eb;
+      font-weight: bold;
+    }
+
+    #sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 220px;
+  height: 100%;
+  background: #020617;
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid #1e293b;
+}
+
+#sidebar h3 {
+  margin-top: 0;
+  color: #e5e7eb;
+}
+
+#listaTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-item {
+  padding: 6px 10px;
+  background: #1e293b;
+  border-radius: 20px;
+  font-size: 16px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  font-weight: bold;
+}
+
+.tag-item:hover {
+  background: #38bdf8;
+  color: #020617;
+  transform: scale(1.05);
+}
+
+.tag-item.ativa {
+  background: #0ea5e9;
+  color: #020617;
+  border: 1px solid #38bdf8;
+}
+  </style>
+</head>
+<body>
+
+<header>Explorador de Citações</header>
+
+<p id="status"></p>
+
+<input 
+  type="text" 
+  id="buscaTag" 
+  placeholder="Buscar por tag (#life, #love, #humor,...)" 
+/>
+
+<div id="sidebar">
+  <h3>Tags</h3>
+  <div id="listaTags"></div>
+</div>
+
+<div class="container" id="lista"></div>
+
+<script>
+const API_URL = 'http://localhost:3000';
+let dadosGlobais = [];
+
+function atualizar() { //busca dados da api e atualiza a interface
+  fetch(`${API_URL}/dados`)
+    .then(res => res.json())
+    .then(data => {
+      dadosGlobais = data; //guarda todos os dados para uso nos filtros
+      renderizar(data);//exibe os cards
+      gerarTags(data);    //exibe as tags na sidebar
+      atualizarStatus();
+    })
+    .catch(err => console.error(err));
+}
+// cria e insere um card na tela para cada citação recebida
+function renderizar(data) {
+  const lista = document.getElementById('lista');
+  lista.innerHTML = "";
+
+  data.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'card';
+
+    div.innerHTML = `
+      <div class="autor">${item.autor || 'Desconhecido'}</div>
+      <div>${item.texto || ''}</div>
+
+      <div><strong>Página:</strong> ${item.pagina || '-'}</div>
+
+      <div class="tags">
+        <strong>Tags:</strong> 
+        ${item.tags && item.tags.length > 0 
+          ? item.tags.map(tag => `#${tag}`).join(' ') 
+          : 'Sem tags'}
+      </div>
+
+      ${item.linkAutor 
+        ? `<a class="link" href="${item.linkAutor}" target="_blank">Ver autor</a>` 
+        : ''}
+    `;
+
+    lista.appendChild(div);
+  });
+}
+
+
+function atualizarStatus() {
+  const status = document.getElementById('status'); //mostra a hora da última atualização
+  const agora = new Date().toLocaleTimeString();
+  status.textContent = `Atualizado às ${agora}`;
+}
+
+
+document.getElementById('buscaTag').addEventListener('input', (e) => {   //filtro por tag
+  const valor = e.target.value.toLowerCase().replace('#', '');
+// se o campo estiver vazio, mostra tudo de volta
+  if (!valor) {
+    renderizar(dadosGlobais);
+    return;
+  }
+
+  const filtrados = dadosGlobais.filter(item =>
+    item.tags && item.tags.some(tag =>
+      tag.toLowerCase().includes(valor)
+    )
+  );
+
+  renderizar(filtrados);
+});
+
+function gerarTags(data) {
+  const listaTags = document.getElementById('listaTags');
+  listaTags.innerHTML = "";
+// Set garante que cada tag apareça só uma vez
+  const tagsSet = new Set();
+
+  data.forEach(item => {
+    if (item.tags) {
+      item.tags.forEach(tag => tagsSet.add(tag));
+    }
+  });
+
+  tagsSet.forEach(tag => {
+    const div = document.createElement('div');
+    div.className = 'tag-item';
+    div.textContent = tag;
+
+    div.onclick = () => filtrarPorTag(tag);
+
+    listaTags.appendChild(div);
+  });
+}
+
+function filtrarPorTag(tag) {
+  const filtrados = dadosGlobais.filter(item =>
+    item.tags && item.tags.includes(tag)
+  );
+
+  renderizar(filtrados);
+}
+
+atualizar();
+
+setInterval(atualizar, 60000);//60 seg
+</script>
+</body>
+</html>
